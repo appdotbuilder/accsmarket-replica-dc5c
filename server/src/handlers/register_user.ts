@@ -1,18 +1,43 @@
+import { db } from '../db';
+import { usersTable } from '../db/schema';
 import { type RegisterUserInput, type User } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function registerUser(input: RegisterUserInput): Promise<User> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to register a new user with encrypted password
-    // and store them in the database.
-    // Should hash the password, validate email uniqueness, and create user record.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
-        email: input.email,
-        password_hash: 'hashed_password_placeholder', // Should be bcrypt hash
+export const registerUser = async (input: RegisterUserInput): Promise<User> => {
+  try {
+    // Check if user with this email already exists (case-insensitive)
+    const existingUsers = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.email, input.email.toLowerCase()))
+      .execute();
+
+    if (existingUsers.length > 0) {
+      throw new Error('User with this email already exists');
+    }
+
+    // Hash the password using Bun's built-in password hashing
+    const password_hash = await Bun.password.hash(input.password);
+
+    // Insert new user record
+    const result = await db.insert(usersTable)
+      .values({
+        email: input.email.toLowerCase(), // Store email in lowercase
+        password_hash,
         role: input.role,
         is_verified: false,
-        balance: 0,
-        created_at: new Date(),
-        updated_at: null
-    } as User);
-}
+        balance: '0.00' // Convert number to string for numeric column
+      })
+      .returning()
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    const user = result[0];
+    return {
+      ...user,
+      balance: parseFloat(user.balance) // Convert string back to number
+    };
+  } catch (error) {
+    console.error('User registration failed:', error);
+    throw error;
+  }
+};

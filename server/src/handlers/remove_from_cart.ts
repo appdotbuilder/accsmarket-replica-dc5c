@@ -1,7 +1,23 @@
+import { db } from '../db';
+import { cartItemsTable } from '../db/schema';
+import { eq, and } from 'drizzle-orm';
+
 export async function removeFromCart(cartItemId: number, buyerId: number): Promise<boolean> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to remove an item from user's shopping cart.
-    // Should verify the cart item belongs to the buyer before removing.
-    // Returns true if successfully removed, false otherwise.
-    return Promise.resolve(true);
+  try {
+    // Verify the cart item belongs to the buyer and delete it in one operation
+    const result = await db.delete(cartItemsTable)
+      .where(
+        and(
+          eq(cartItemsTable.id, cartItemId),
+          eq(cartItemsTable.buyer_id, buyerId)
+        )
+      )
+      .execute();
+
+    // Check if any rows were affected (item was found and deleted)
+    return result.rowCount !== null && result.rowCount > 0;
+  } catch (error) {
+    console.error('Failed to remove item from cart:', error);
+    throw error;
+  }
 }
